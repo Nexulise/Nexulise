@@ -60,23 +60,40 @@ function CanvasComponent(props) {
 
         switch(type) {
             case "rectangle":
-                const minX = Math.min(x1, x2);
-                const minY = Math.min(y1, y2);
-                const maxX = Math.max(x1, x2);
-                const maxY = Math.max(y1, y2);
-                return mouseX >= minX && mouseX <= maxX && mouseY >= minY && mouseY <= maxY;
+                const nw = {x: x1, y: y1};
+                const ne = {x: x2, y: y1};
+                const sw = {x: x1, y: y2};
+                const se = {x: x2, y: y2}; 
+                const pos = { x: mouseX, y: mouseY };
+
+                // Check for each line of rectangle if mouse is on it
+                if(isPosOnLine(pos, nw, ne)) return true;
+                if(isPosOnLine(pos, ne, se)) return true;
+                if(isPosOnLine(pos, se, sw)) return true;
+                if(isPosOnLine(pos, sw, nw)) return true;
+
+                // Check if mouse is within rectangle
+                // const minX = Math.min(x1, x2);
+                // const minY = Math.min(y1, y2);
+                // const maxX = Math.max(x1, x2);
+                // const maxY = Math.max(y1, y2);
+                // return mouseX >= minX && mouseX <= maxX && mouseY >= minY && mouseY <= maxY;
             case "line":
                 const a = { x: x1, y: y1 };
                 const b = { x: x2, y: y2 };
                 const c = { x: mouseX, y: mouseY };
-                
-                const offset = distance(a, b) - (distance(a, c) + distance(b, c));
-                const onLine = Math.abs(offset) < 1;
-                return onLine;
+
+                return isPosOnLine(c, a, b);
             default:
                 console.log("no type");
                 break;
         }      
+    }
+
+    function isPosOnLine(pos, startLine, endLine){
+        const offset = distance(startLine, endLine) - (distance(startLine, pos) + distance(endLine, pos));
+        const onLine = Math.abs(offset) < 1;
+        return onLine;
     }
 
     function getElementAtMousePosition (mouseX, mouseY, elements) {
