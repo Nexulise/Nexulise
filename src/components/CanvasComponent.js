@@ -2,6 +2,7 @@ import { set } from 'lodash';
 import React, { useLayoutEffect, useState, useContext } from 'react';
 import rough from 'roughjs/bundled/rough.esm';
 import { Context } from '../Store';
+
 const generator = rough.generator();
 
 // Feature toggles
@@ -68,6 +69,17 @@ function CanvasComponent(props) {
                 const se = {x: x2, y: y2}; 
                 const pos = { x: mouseX, y: mouseY };
 
+                const minX = Math.min(x1, x2);
+                const minY = Math.min(y1, y2);
+                const maxX = Math.max(x1, x2);
+                const maxY = Math.max(y1, y2);
+
+                // Check if mouse is in corner (or 1 pixel off)
+                if((Math.abs(mouseX- nw.x) < 2) && (Math.abs(mouseY - nw.y) < 2)) return {cursor: "nw-resize", result: true}
+                if((Math.abs(mouseX - ne.x) < 2) && (Math.abs(mouseY - ne.y) < 2)) return {cursor: "ne-resize", result: true}
+                if((Math.abs(mouseX - sw.x) < 2) && (Math.abs(mouseY- sw.y) < 2)) return {cursor: "sw-resize", result: true}
+                if((Math.abs(mouseX - se.x) < 2) && (Math.abs(mouseY - se.y) < 2)) return {cursor: "se-resize", result: true}
+
                 // Check for each line of rectangle if mouse is on it
                 if(isPosOnLine(pos, nw, ne)) return {cursor: "n-resize", result: true};
                 if(isPosOnLine(pos, ne, se)) return {cursor: "e-resize", result: true};
@@ -75,19 +87,20 @@ function CanvasComponent(props) {
                 if(isPosOnLine(pos, sw, nw)) return {cursor: "w-resize", result: true};
 
                 // Check if mouse is within rectangle
-                const minX = Math.min(x1, x2);
-                const minY = Math.min(y1, y2);
-                const maxX = Math.max(x1, x2);
-                const maxY = Math.max(y1, y2);
                 const result = mouseX >= minX && mouseX <= maxX && mouseY >= minY && mouseY <= maxY;
                 return {cursor: "move", result: result};
             case "line":
                 const a = { x: x1, y: y1 };
                 const b = { x: x2, y: y2 };
                 const c = { x: mouseX, y: mouseY };
+
                 console.log("c: " + c.x + ", " + c.y + " a: " + a.x + ", " + a.y);
-                if(c.x == a.x && c.y == a.y) return {cursor: "pointer", result: true}
-                if(c.x == b.x && c.y == b.y) return {cursor: "pointer", result: true}
+
+                if((Math.abs(c.x - a.x) < 2) && (Math.abs(c.y - a.y) < 2)) return {cursor: "pointer", result: true}
+                if((Math.abs(c.x - b.x) < 2) && (Math.abs(c.y - b.y) < 2)) return {cursor: "pointer", result: true}
+
+                // if(c.x == a.x && c.y == a.y) return {cursor: "pointer", result: true}
+                // if(c.x == b.x && c.y == b.y) return {cursor: "pointer", result: true}
                 return {cursor: "move", result: isPosOnLine(c, a, b)};
             default:
                 console.log("no type");
