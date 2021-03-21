@@ -1,3 +1,4 @@
+import { set } from 'lodash';
 import React, { useLayoutEffect, useState, useContext } from 'react';
 import rough from 'roughjs/bundled/rough.esm';
 import { Context } from '../Store';
@@ -18,6 +19,7 @@ function CanvasComponent(props) {
     const [activeTool, setActiveTool] = useContext(Context);
     const [selectedElement, setSelectedElement] = useState(null);
     const [hoveredElement, setHoveredElement] = useState(null);
+    const [cursor, setCursor] = useState('default');
 
     useLayoutEffect(() => {
         const canvas = document.getElementById('main_canvas');
@@ -67,23 +69,26 @@ function CanvasComponent(props) {
                 const pos = { x: mouseX, y: mouseY };
 
                 // Check for each line of rectangle if mouse is on it
-                if(isPosOnLine(pos, nw, ne)) return true;
-                if(isPosOnLine(pos, ne, se)) return true;
-                if(isPosOnLine(pos, se, sw)) return true;
-                if(isPosOnLine(pos, sw, nw)) return true;
+                if(isPosOnLine(pos, nw, ne)) return {cursor: "n-resize", result: true};
+                if(isPosOnLine(pos, ne, se)) return {cursor: "e-resize", result: true};
+                if(isPosOnLine(pos, se, sw)) return {cursor: "s-resize", result: true};
+                if(isPosOnLine(pos, sw, nw)) return {cursor: "w-resize", result: true};
 
                 // Check if mouse is within rectangle
-                // const minX = Math.min(x1, x2);
-                // const minY = Math.min(y1, y2);
-                // const maxX = Math.max(x1, x2);
-                // const maxY = Math.max(y1, y2);
-                // return mouseX >= minX && mouseX <= maxX && mouseY >= minY && mouseY <= maxY;
+                const minX = Math.min(x1, x2);
+                const minY = Math.min(y1, y2);
+                const maxX = Math.max(x1, x2);
+                const maxY = Math.max(y1, y2);
+                const result = mouseX >= minX && mouseX <= maxX && mouseY >= minY && mouseY <= maxY;
+                return {cursor: "move", result: result};
             case "line":
                 const a = { x: x1, y: y1 };
                 const b = { x: x2, y: y2 };
                 const c = { x: mouseX, y: mouseY };
-
-                return isPosOnLine(c, a, b);
+                console.log("c: " + c.x + ", " + c.y + " a: " + a.x + ", " + a.y);
+                if(c.x == a.x && c.y == a.y) return {cursor: "pointer", result: true}
+                if(c.x == b.x && c.y == b.y) return {cursor: "pointer", result: true}
+                return {cursor: "move", result: isPosOnLine(c, a, b)};
             default:
                 console.log("no type");
                 break;
@@ -97,7 +102,12 @@ function CanvasComponent(props) {
     }
 
     function getElementAtMousePosition (mouseX, mouseY, elements) {
-        return elements.find(element => isWithinElement(mouseX, mouseY, element));
+
+        return elements.find(element => {
+            var res = isWithinElement(mouseX, mouseY, element);
+            if(res.result) setCursor(res.cursor);
+            return res.result;
+        });
     }
 
     function updateElement(id, x1, y1, x2, y2, color, type) {
@@ -142,10 +152,17 @@ function CanvasComponent(props) {
         if(!hoveringEnabled) return;
         if(activeTool === 'selection' && action !== 'moving') {
             const{clientX, clientY} = event;
-            console.log("Hovering mouse: " + action);
+            // console.log("Hovering mouse: " + action);
             const element = getElementAtMousePosition(clientX, clientY, elements);
+            // if(Object.keys(result).length > 0){
+                // console.log("Element found: " + result.element + " " + result.cursor);
+            // }
+            
+            // var element;
             if(element) {
-                event.target.style.cursor = "move";
+                console.log("el found");
+                event.target.style.cursor = cursor;
+                // element = result.element
                 if(hoveredElement) {
                     if(element.id !== hoveredElement.id) {
                    
