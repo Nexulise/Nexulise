@@ -49,7 +49,7 @@ function CanvasComponent(props) {
             break;
         }
         
-        return {id, x1, y1, x2, y2, type, roughElement};
+        return {id, x1, y1, x2, y2, type, strokeColor, roughElement};
     }
 
     function distance(a, b) {
@@ -94,7 +94,7 @@ function CanvasComponent(props) {
                 const b = { x: x2, y: y2 };
                 const c = { x: mouseX, y: mouseY };
 
-                console.log("c: " + c.x + ", " + c.y + " a: " + a.x + ", " + a.y);
+                // console.log("c: " + c.x + ", " + c.y + " a: " + a.x + ", " + a.y);
 
                 if((Math.abs(c.x - a.x) < 2) && (Math.abs(c.y - a.y) < 2)) return {cursor: "pointer", result: true}
                 if((Math.abs(c.x - b.x) < 2) && (Math.abs(c.y - b.y) < 2)) return {cursor: "pointer", result: true}
@@ -127,6 +127,24 @@ function CanvasComponent(props) {
         const updatedElement = CreateNewElement(id, x1, y1, x2, y2, color, type);
         
         if(updatedElement) addElement(updatedElement);
+    }
+
+    function adjustElementCoordinates(element){
+        const {type, x1, y1, x2, y2} = element;
+
+        if(type === 'rectangle') {
+            const minX = Math.min(x1, x2);
+            const minY = Math.min(y1, y2);
+            const maxX = Math.max(x1, x2);
+            const maxY = Math.max(y1, y2); 
+            return{x1: minX, y1: minY, x2: maxX, y2: maxY};
+        } else {
+            if(x1 < x2 || (x1 === x2 && y1 < y2)) {
+                return {x1, y1, x2, y2};
+            } else {
+                return {x1: x2, y1: y2, x2: x1, y2: y1};
+            }
+        }
     }
 
     function recolorElement(element, color){
@@ -173,7 +191,7 @@ function CanvasComponent(props) {
             
             // var element;
             if(element) {
-                console.log("el found");
+                console.log("[" + element.x1 + ", "  + element.y1 + "], [" + element.x2 + ", " + element.y2 + "]");
                 event.target.style.cursor = cursor;
                 // element = result.element
                 if(hoveredElement) {
@@ -225,6 +243,12 @@ function CanvasComponent(props) {
     };
 
     const handleMouseUp = (event) => {
+        const index = elements.length - 1;
+        const {id, type, strokeColor} = elements[index];
+        if(action === 'drawing') {
+            const {x1, y1, x2, y2} = adjustElementCoordinates(elements[index]);
+            updateElement(id, x1, y1, x2, y2, strokeColor, type);
+        }
         setAction('none');
         setSelectedElement(null);
     };
