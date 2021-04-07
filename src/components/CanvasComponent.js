@@ -4,22 +4,34 @@ import rough from 'roughjs/bundled/rough.esm';
 import { Context } from '../Store';
 
 const generator = rough.generator();
+var connectionEllipse;
 
 // Feature toggles
 const drawingEnabled = true;
 const movingEnabled = true;
 const hoveringEnabled = true;
+const resizingEnabled = true;
 
 // Application properties
-const accentColor = "#FF5A5A";
-const elementColor = 'white';
+const elementColor = '#8ccbe6';//"#FF5A5A";
+const lineColor = '#e0c689';
+const accentColor = '#afedc0';
+const connectColor = '#ed7ee9';
+const offSetToPoint = 5;
+const connectionEllipseHeight = 10;
+const connectionEllipseWidth = 10;
+const connectionEllipseFill = '#ffffff';
+const connectionEllipseFillStyle = 'solid';
+const connectionEllipseStroke = '#ffffff';
 
 function CanvasComponent(props) {
     const [elements, setElements] = useState([]);
+    const [connectionPoints, setConnectionPoints] = useState([]);
     const [action, setAction] = useState('none');  
     const [activeTool, setActiveTool] = useContext(Context);
     const [selectedElement, setSelectedElement] = useState(null);
     const [hoveredElement, setHoveredElement] = useState(null);
+    const [connectableElement, setConnectableElement] = useState(null);
     const [cursor, setCursor] = useState('default');
 
     useLayoutEffect(() => {
@@ -30,16 +42,25 @@ function CanvasComponent(props) {
         const roughCanvas = rough.canvas(canvas);
         
         elements.forEach(({roughElement}) => roughCanvas.draw(roughElement));
-    }, [elements]);
+        connectionPoints.forEach(({element}) => {
+            console.log("here");
+            roughCanvas.draw(element)});
+        if(connectionEllipse) roughCanvas.draw(connectionEllipse.element);
+    }, [elements, connectionPoints, connectionEllipse], );
 
     function CreateNewElement(id, x1, y1, x2, y2, strokeColor, type){
         if(!type) type = activeTool;
         var roughElement;
         switch(type) {
         case 'rectangle':
+            generator.ellipse(x1, y1, 100, 100, {
+                fill: 'red', 
+                stroke: strokeColor, 
+                fillStyle: connectionEllipseFillStyle});
             roughElement = generator.rectangle(x1,y1,x2-x1,y2-y1, {stroke: strokeColor});
             break;
         case 'line':
+            if(strokeColor === elementColor) strokeColor = lineColor;
             roughElement = generator.line(x1,y1,x2,y2, {stroke: strokeColor});
             break;
         case 'selection':
@@ -50,6 +71,14 @@ function CanvasComponent(props) {
         }
         
         return {id, x1, y1, x2, y2, type, strokeColor, roughElement};
+    }
+
+    function createNewEllipse(id, x, y, h, w, strokeColor, fill) {
+        const element =  generator.ellipse(x, y, w, h, {
+            fill: fill, 
+            stroke: strokeColor, 
+            fillStyle: connectionEllipseFillStyle});
+        return {x, y, h, w, strokeColor, fill, element};
     }
 
     function distance(a, b) {
@@ -75,58 +104,181 @@ function CanvasComponent(props) {
                 const maxY = Math.max(y1, y2);
 
                 // Check if mouse is in corner (or 1 pixel off)
-                if((Math.abs(mouseX- nw.x) < 2) && (Math.abs(mouseY - nw.y) < 2)) return {cursor: "nw-resize", result: true}
-                if((Math.abs(mouseX - ne.x) < 2) && (Math.abs(mouseY - ne.y) < 2)) return {cursor: "ne-resize", result: true}
-                if((Math.abs(mouseX - sw.x) < 2) && (Math.abs(mouseY- sw.y) < 2)) return {cursor: "sw-resize", result: true}
-                if((Math.abs(mouseX - se.x) < 2) && (Math.abs(mouseY - se.y) < 2)) return {cursor: "se-resize", result: true}
-
-                // Check for each line of rectangle if mouse is on it
-                if(isPosOnLine(pos, nw, ne)) return {cursor: "n-resize", result: true};
-                if(isPosOnLine(pos, ne, se)) return {cursor: "e-resize", result: true};
-                if(isPosOnLine(pos, se, sw)) return {cursor: "s-resize", result: true};
-                if(isPosOnLine(pos, sw, nw)) return {cursor: "w-resize", result: true};
-
+                const nwPoint = nearPoint(mouseX, mouseY, x1, y1, offSetToPoint, "nw-resize");
+                const nePoint = nearPoint(mouseX, mouseY, x2, y1, offSetToPoint, "ne-resize");
+                const swPoint = nearPoint(mouseX, mouseY, x1, y2, offSetToPoint, "sw-resize");
+                const sePoint = nearPoint(mouseX, mouseY, x2, y2, offSetToPoint, "se-resize");
+                
+                const nLine = isPosOnLine(pos, nw, ne, "n-resize");
+                const eLine = isPosOnLine(pos, ne, se, "e-resize");
+                const sLine = isPosOnLine(pos, se, sw, "s-resize");
+                const wLine = isPosOnLine(pos, sw, nw, "w-resize");
+                
                 // Check if mouse is within rectangle
-                const result = mouseX >= minX && mouseX <= maxX && mouseY >= minY && mouseY <= maxY;
-                return {cursor: "move", result: result};
+                const inside = mouseX >= minX && mouseX <= maxX && mouseY >= minY && mouseY <= maxY ? "move" : null;
+
+                return nwPoint || nePoint || swPoint || sePoint || nLine || eLine || sLine || wLine || inside;
+                // return {cursor: "move", result: result};
             case "line":
                 const a = { x: x1, y: y1 };
                 const b = { x: x2, y: y2 };
                 const c = { x: mouseX, y: mouseY };
 
                 // console.log("c: " + c.x + ", " + c.y + " a: " + a.x + ", " + a.y);
+                const startLine = nearPoint(mouseX, mouseY, x1, y1, offSetToPoint, "startLine");
+                const endLine = nearPoint(mouseX, mouseY, x2, y2, offSetToPoint, "endLine");
+                const onLine = isPosOnLine(c, a, b, "move");
 
-                if((Math.abs(c.x - a.x) < 2) && (Math.abs(c.y - a.y) < 2)) return {cursor: "pointer", result: true}
-                if((Math.abs(c.x - b.x) < 2) && (Math.abs(c.y - b.y) < 2)) return {cursor: "pointer", result: true}
-
-                // if(c.x == a.x && c.y == a.y) return {cursor: "pointer", result: true}
-                // if(c.x == b.x && c.y == b.y) return {cursor: "pointer", result: true}
-                return {cursor: "move", result: isPosOnLine(c, a, b)};
+                return startLine || endLine || onLine;
+            
             default:
                 console.log("no type");
                 break;
         }      
     }
 
-    function isPosOnLine(pos, startLine, endLine){
+    function nearPoint(x, y, x1, y1, offset, name){
+        return (Math.abs(x- x1) < offset) && (Math.abs(y - y1) < offset) ? name : null;
+    }
+
+    function isPosOnLine(pos, startLine, endLine, name){
         const offset = distance(startLine, endLine) - (distance(startLine, pos) + distance(endLine, pos));
         const onLine = Math.abs(offset) < 1;
-        return onLine;
+        return onLine ? name : null;
+    }
+
+    /**
+     * input:
+     * (x1, y1) -> random point
+     * (x2, y2) & (x3, y3) two ends of a line
+     * output:
+     * 0 -> x2, y2 is closest to x1, y1
+     * 1 -> x3, y3 is closest to x1, y1
+     */
+    function getClosestToPoint(x1, y1, x2, y2, x3, y3){
+        const distanceA = distance({x: x1, y: y1}, {x: x2, y: y2});//Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2));
+        const distanceB = distance({x: x1, y: y1}, {x: x3, y: y3});//Math.sqrt(Math.pow(x1 - x3, 2) + Math.pow(y1 - y3, 2));
+        console.log(distanceA + " " + distanceB);
+        if(distanceA > distanceB) return 0;
+        return 1;
     }
 
     function getElementAtMousePosition (mouseX, mouseY, elements) {
 
-        return elements.find(element => {
-            var res = isWithinElement(mouseX, mouseY, element);
-            if(res.result) setCursor(res.cursor);
-            return res.result;
-        });
+        return elements
+            .map(element => ({...element, position: isWithinElement(mouseX, mouseY, element)}))
+            .find(element => element.position !== null);
+    }
+
+    function highlightElement(element) {
+        recolorElement(element, accentColor);
+        showConnectionPointsOnElement(element);
+    }
+
+    function unHighlightElement(element) {
+        recolorElement(element, elementColor);
+        hideConnectionPointsOnElement(element);
+    }
+
+    /**
+     * shows circles to show where to start a line from to connect to other elements
+     * @param {*} element 
+     */
+    function showConnectionPointsOnElement(element){
+        if(!element) return -1;
+        if(element.type !== 'rectangle') return -1;
+
+        const { x1, y1, x2, y2 } = element;
+        addConnectionPoint(createNewEllipse(0, x1, y1, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill)); // nw
+        addConnectionPoint(createNewEllipse(1, x2, y1, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill)); // ne
+        addConnectionPoint(createNewEllipse(2, x1, y2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill)); // sw
+        addConnectionPoint(createNewEllipse(3, x2, y2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill)); // se
+        addConnectionPoint(createNewEllipse(4, (x1 + x2) / 2, y1, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill)); // n
+        addConnectionPoint(createNewEllipse(5, x2, (y1 + y2) / 2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill)); // e
+        addConnectionPoint(createNewEllipse(6, (x1 + x2) / 2, y2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill)); // s
+        addConnectionPoint(createNewEllipse(7, x1, (y1 + y2) / 2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill)); // w
+    }
+
+    /**
+     * hides circles to show where to start a line from to connect to other elements
+     * @param {*} element 
+     */
+    function hideConnectionPointsOnElement(element){
+        clearConnectionPoints();
+    }
+
+    function showConnectionPointOnElement(position, element) {
+        const {x1, y1, x2, y2, type} = element;
+
+        switch(position){
+            case "nw-resize":
+                updateConEllipse(x1, y1, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseStroke, connectionEllipseFill);
+                break;
+            case "ne-resize":
+                console.log("Drawing connection ellipse ne");
+                updateConEllipse(x2, y1, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseStroke, connectionEllipseFill);
+                break;
+            case "se-resize":
+                updateConEllipse(x2, y2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseStroke, connectionEllipseFill);
+                break;
+            case "sw-resize":
+                updateConEllipse(x1, y2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseStroke, connectionEllipseFill);
+                break;
+            case "s-resize":
+                updateConEllipse((x1 + x2) / 2, y2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseStroke, connectionEllipseFill);
+                break;
+            case "n-resize":
+                updateConEllipse((x1 + x2) / 2, y1, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseStroke, connectionEllipseFill);
+                break;
+            case "e-resize":
+                updateConEllipse(x2, (y1 + y2) / 2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseStroke, connectionEllipseFill);
+                break;
+            case "w-resize":
+                updateConEllipse(x1, (y1 + y2) / 2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseStroke, connectionEllipseFill);
+                break;
+        }
     }
 
     function updateElement(id, x1, y1, x2, y2, color, type) {
         const updatedElement = CreateNewElement(id, x1, y1, x2, y2, color, type);
         
         if(updatedElement) addElement(updatedElement);
+    }
+
+    function updateConEllipse(x, y, h, w, stroke, fill) {
+        const updatedEllipse = createNewEllipse(0, x, y, h, w, stroke, fill);
+        if(updatedEllipse) connectionEllipse = updatedEllipse;
+        // if(updatedEllipse) addConEllipse(updatedEllipse);
+    }
+
+    function resizedCoordinates(mouseX, mouseY, position, coordinates) {
+        const { x1, y1, x2, y2 } = coordinates;
+        switch(position) {
+            case "nw-resize":
+            case "startLine":
+                return { x1: mouseX, y1: mouseY, x2, y2 };
+            case "ne-resize":
+                return { x1, y1: mouseY, x2: mouseX, y2 };
+            case "se-resize":
+            case "endLine":
+                return { x1, y1, x2: mouseX, y2: mouseY };
+            case "sw-resize":
+                return { x1: mouseX, y1, x2, y2: mouseY};
+            case "s-resize":
+                return {x1, y1, x2, y2: mouseY};
+            case "n-resize":
+                return {x1, y1: mouseY, x2, y2};
+            case "e-resize":
+                return {x1, y1, x2: mouseX, y2};
+            case "w-resize":
+                return {x1: mouseX, y1, x2, y2};
+            default:
+                return { x1, y1, x2, y2 };
+        }
+    }
+
+    function setCursorForLine(name) {
+        return name === "startLine" || name === "endLine" ? "pointer" : name;
     }
 
     function adjustElementCoordinates(element){
@@ -164,10 +316,10 @@ function CanvasComponent(props) {
     }
 
     function handleMoving(event) {
+        const{clientX, clientY} = event;
         if(!movingEnabled) return;
         if(action === 'moving') {
             setHoveredElement(null);
-            const{clientX, clientY} = event;
             const { id, x1, x2, y1, y2, type, offsetX, offsetY } = selectedElement;
             
             const width = x2 - x1;
@@ -176,32 +328,85 @@ function CanvasComponent(props) {
             const newY = clientY - offsetY;
     
             updateElement(id, newX, newY, (newX + width), (newY + height), accentColor, type);
+        } 
+    }
+
+    function handleResizing(event){
+        const{clientX, clientY} = event;
+        if(!resizingEnabled) return;
+
+        if(action === 'resizing') {
+            if(selectedElement){
+                setHoveredElement(null);
+                const { id, type, position, ...coordinates } = selectedElement;
+                const {x1, y1, x2, y2} = resizedCoordinates(clientX, clientY, position, coordinates);
+                updateElement(id, x1, y1, x2, y2, elementColor, type);
+                if(selectedElement.type === 'line'){
+                    handleConnectingElements(event);
+                }
+            } 
+        }
+    }
+
+    function handleConnectingElements(event){
+        const{clientX, clientY} = event;
+        const elementsTempCopy = [...elements];
+        var elementsWithoutLines = [];
+        var index = 0;
+        elementsTempCopy.forEach(element => {
+            if(element.type !== 'line'){
+                elementsWithoutLines[index++] = element;
+            }
+        });
+        const connectableElementOption = getElementAtMousePosition(clientX, clientY, elementsWithoutLines);
+        // There is a connectable element at mouse position (mouse position == start/end of line)
+        if(connectableElementOption){
+            const position = connectableElementOption.position;
+            showConnectionPointOnElement(position, connectableElementOption);
+            // There is already a connectable element
+            if(connectableElement){
+                // There is a new option to connect to
+                if(connectableElementOption.id !== connectableElement.id){
+                    recolorElement(connectableElement, elementColor);
+                    setConnectableElement(connectableElementOption);
+                } else if(connectableElementOption.strokeColor !== connectColor){
+                    // The option to connect to is the same one as already suggested
+                    recolorElement(connectableElement, connectColor);
+                }
+            } else {
+                // There was no connectable element yet, but there is one now 
+                setConnectableElement(connectableElementOption);
+            }
+            // recolorElement(connectableElement, connectColor); // highlights element in connectColor
+        } else if(connectableElement){
+            // There is no connectable element
+            recolorElement(connectableElement, elementColor);
+            setConnectableElement(null);
+            clearConEllipse();
         }
     }
     
+    /**
+     * Hovering over an element to hightlight it
+     */
     function handleHovering(event){ // Hovering over an element to hightlight it
         if(!hoveringEnabled) return;
-        if(activeTool === 'selection' && action !== 'moving') {
+        if(activeTool === 'selection' && action !== 'moving' && action !== 'resizing') {
             const{clientX, clientY} = event;
-            // console.log("Hovering mouse: " + action);
-            const element = getElementAtMousePosition(clientX, clientY, elements);
-            // if(Object.keys(result).length > 0){
-                // console.log("Element found: " + result.element + " " + result.cursor);
-            // }
+            const element = getElementAtMousePosition(clientX, clientY, elements); 
             
-            // var element;
             if(element) {
-                console.log("[" + element.x1 + ", "  + element.y1 + "], [" + element.x2 + ", " + element.y2 + "]");
-                event.target.style.cursor = cursor;
-                // element = result.element
+                element.position = setCursorForLine(element.position);
+                event.target.style.cursor = element.position;
+
                 if(hoveredElement) {
                     if(element.id !== hoveredElement.id) {
                    
-                        recolorElement(hoveredElement, elementColor);
+                        unHighlightElement(hoveredElement);
                         setHoveredElement(element);
 
                     } else {
-                        recolorElement(hoveredElement, accentColor);
+                        highlightElement(hoveredElement);
                     }
                 } 
                 else {
@@ -211,13 +416,13 @@ function CanvasComponent(props) {
 
             } else if(hoveredElement) { 
                 event.target.style.cursor = "default";
-                recolorElement(hoveredElement, elementColor);
+                unHighlightElement(hoveredElement);
                 setHoveredElement(null);
             }
         }
     }
 
-    const handleMouseDown = (event) => {
+    function handleMouseDown(event) {
         const{clientX, clientY} = event;
         if(activeTool === 'selection') {
             const element = getElementAtMousePosition(clientX, clientY, elements);
@@ -225,7 +430,14 @@ function CanvasComponent(props) {
                 const offsetX = clientX - element.x1;
                 const offsetY = clientY - element.y1;
                 setSelectedElement({...element, offsetX, offsetY});
-                setAction('moving');
+
+                if(element.position === "move"){
+                    setAction('moving');
+                } else {
+                    // console.log("Action set to resizing");
+                    setAction('resizing');
+                }
+                
             }
         } else {
             setAction('drawing');
@@ -233,33 +445,67 @@ function CanvasComponent(props) {
             const element = CreateNewElement(id, clientX, clientY, clientX, clientY, accentColor);
             if(element) setElements(prevState => [...prevState, element]);
         }
-    };
+    }
 
-    const handleMouseMove = (event) => {
+    function handleMouseMove(event){
 
         handleDrawing(event);
         handleMoving(event);
         handleHovering(event);
-    };
+        handleResizing(event);
+    }
 
-    const handleMouseUp = (event) => {
+    function handleMouseUp(event) {
         const index = elements.length - 1;
-        const {id, type, strokeColor} = elements[index];
+        
         if(action === 'drawing') {
+            const {id, type, strokeColor} = elements[index];
             const {x1, y1, x2, y2} = adjustElementCoordinates(elements[index]);
             updateElement(id, x1, y1, x2, y2, strokeColor, type);
         }
+
+        if(connectionEllipse) { //action == 'resizing' && selectedElement && selectedElement.type === 'line'
+
+            const { id, x1, y1, x2, y2, color, type } = selectedElement;
+            const { x, y } = connectionEllipse;
+            updateElement(id, x, y, x2, y2, elementColor, type);
+            console.log(getClosestToPoint(x ,y, x1, y1, x2, y2));
+            // if(getClosestToPoint(x, y, x1, y1, x2, y2) === 0){
+                
+            // } else {
+            //     updateElement(id, x1, y1, x, y, elementColor, type);
+            // }
+            // console.log("data: " + id + " " + x + " " + y + " " + x2 + " " + y2 + " " + elementColor + " " + type);
+            
+        }
         setAction('none');
         setSelectedElement(null);
-    };
+        clearConEllipse();
+    }
 
-    const addElement = (element) => {
+    function addElement(element) {
         const index = element.id;
         const elementsCopy = [...elements];
         elementsCopy[index] = element;
         
         setElements(elementsCopy);
-    };
+    }
+
+    function addConnectionPoint(connectionPoint) {
+        const index = connectionPoint.id;
+        const connectionsPointsCopy = [...connectionPoints];
+        connectionsPointsCopy[index] = connectionPoint;
+        
+        setConnectionPoints(connectionsPointsCopy);
+    }
+
+    function clearConnectionPoints() {
+        setConnectionPoints([]);
+    }
+
+    function clearConEllipse() {
+        connectionEllipse = null;
+    }
 
     return (
         <canvas 
