@@ -42,9 +42,7 @@ function CanvasComponent(props) {
         const roughCanvas = rough.canvas(canvas);
         
         elements.forEach(({roughElement}) => roughCanvas.draw(roughElement));
-        connectionPoints.forEach(({element}) => {
-            console.log("here");
-            roughCanvas.draw(element)});
+        drawConnectionPoints(roughCanvas);
         if(connectionEllipse) roughCanvas.draw(connectionEllipse.element);
     }, [elements, connectionPoints, connectionEllipse], );
 
@@ -74,11 +72,11 @@ function CanvasComponent(props) {
     }
 
     function createNewEllipse(id, x, y, h, w, strokeColor, fill) {
-        const element =  generator.ellipse(x, y, w, h, {
+        const element = generator.ellipse(x, y, w, h, {
             fill: fill, 
             stroke: strokeColor, 
             fillStyle: connectionEllipseFillStyle});
-        return {x, y, h, w, strokeColor, fill, element};
+        return {id, x, y, h, w, strokeColor, fill, element};
     }
 
     function distance(a, b) {
@@ -177,7 +175,7 @@ function CanvasComponent(props) {
 
     function unHighlightElement(element) {
         recolorElement(element, elementColor);
-        hideConnectionPointsOnElement(element);
+        hideConnectionPointsOnElement();
     }
 
     /**
@@ -189,21 +187,34 @@ function CanvasComponent(props) {
         if(element.type !== 'rectangle') return -1;
 
         const { x1, y1, x2, y2 } = element;
-        addConnectionPoint(createNewEllipse(0, x1, y1, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill)); // nw
-        addConnectionPoint(createNewEllipse(1, x2, y1, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill)); // ne
-        addConnectionPoint(createNewEllipse(2, x1, y2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill)); // sw
-        addConnectionPoint(createNewEllipse(3, x2, y2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill)); // se
-        addConnectionPoint(createNewEllipse(4, (x1 + x2) / 2, y1, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill)); // n
-        addConnectionPoint(createNewEllipse(5, x2, (y1 + y2) / 2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill)); // e
-        addConnectionPoint(createNewEllipse(6, (x1 + x2) / 2, y2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill)); // s
-        addConnectionPoint(createNewEllipse(7, x1, (y1 + y2) / 2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill)); // w
+        // addConnectionPoint(createNewEllipse(0, x1, y1, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill)); // nw
+        // addConnectionPoint(createNewEllipse(1, x2, y1, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill)); // ne
+        // addConnectionPoint(createNewEllipse(2, x1, y2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill)); // sw
+        // addConnectionPoint(createNewEllipse(3, x2, y2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill)); // se
+        // addConnectionPoint(createNewEllipse(4, (x1 + x2) / 2, y1, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill)); // n
+        // addConnectionPoint(createNewEllipse(5, x2, (y1 + y2) / 2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill)); // e
+        // addConnectionPoint(createNewEllipse(6, (x1 + x2) / 2, y2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill)); // s
+        // addConnectionPoint(createNewEllipse(7, x1, (y1 + y2) / 2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill)); // w
+    
+        const nw = createNewEllipse(0, x1-5, y1-5, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill);
+        const ne = createNewEllipse(1, x2+5, y1-5, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill);
+        const sw = createNewEllipse(2, x1-5, y2+5, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill);
+        const se = createNewEllipse(3, x2+5, y2+5, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill);
+        const n = createNewEllipse(4, (x1 + x2) / 2, y1-5, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill);
+        const e = createNewEllipse(5, x2+5, (y1 + y2) / 2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill);
+        const s = createNewEllipse(6, (x1 + x2) / 2, y2+5, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill);
+        const w = createNewEllipse(7, x1-5, (y1 + y2) / 2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill);
+
+        setConnectionPoints([nw, ne, sw, se, n, e, s, w]);
+        // addConnectionPoint(nw);
+        // addConnectionPoint(ne);
+        // addConnectionPoint(sw);
     }
 
     /**
      * hides circles to show where to start a line from to connect to other elements
-     * @param {*} element 
      */
-    function hideConnectionPointsOnElement(element){
+    function hideConnectionPointsOnElement(){
         clearConnectionPoints();
     }
 
@@ -320,6 +331,7 @@ function CanvasComponent(props) {
         if(!movingEnabled) return;
         if(action === 'moving') {
             setHoveredElement(null);
+            hideConnectionPointsOnElement();
             const { id, x1, x2, y1, y2, type, offsetX, offsetY } = selectedElement;
             
             const width = x2 - x1;
@@ -338,6 +350,7 @@ function CanvasComponent(props) {
         if(action === 'resizing') {
             if(selectedElement){
                 setHoveredElement(null);
+                hideConnectionPointsOnElement();
                 const { id, type, position, ...coordinates } = selectedElement;
                 const {x1, y1, x2, y2} = resizedCoordinates(clientX, clientY, position, coordinates);
                 updateElement(id, x1, y1, x2, y2, elementColor, type);
@@ -457,6 +470,12 @@ function CanvasComponent(props) {
 
     function handleMouseUp(event) {
         const index = elements.length - 1;
+
+        console.log(connectionPoints.length);
+        console.log(connectionPoints);
+        // connectionPoints.forEach(connectionPoint => {
+        //     if(connectionPoint) console.log(connectionPoint.id);
+        // });
         
         if(action === 'drawing') {
             const {id, type, strokeColor} = elements[index];
@@ -491,12 +510,14 @@ function CanvasComponent(props) {
         setElements(elementsCopy);
     }
 
-    function addConnectionPoint(connectionPoint) {
-        const index = connectionPoint.id;
-        const connectionsPointsCopy = [...connectionPoints];
-        connectionsPointsCopy[index] = connectionPoint;
-        
-        setConnectionPoints(connectionsPointsCopy);
+    function addConnectionPoints(connectionPoints) {
+
+        // const index = connectionPoint.id;
+        // const connectionsPointsCopy = [...connectionPoints];
+        // connectionsPointsCopy[index] = connectionPoint;
+
+        // setConnectionPoints(connectionsPointsCopy);
+
     }
 
     function clearConnectionPoints() {
@@ -505,6 +526,14 @@ function CanvasComponent(props) {
 
     function clearConEllipse() {
         connectionEllipse = null;
+    }
+
+    function drawConnectionPoints(rc) {
+        connectionPoints.forEach(connectionPoint => {
+            if(connectionPoint && connectionPoint.element) {
+                rc.draw(connectionPoint.element);
+            }
+        });
     }
 
     return (
