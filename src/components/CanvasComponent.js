@@ -23,6 +23,7 @@ const connectionEllipseWidth = 10;
 const connectionEllipseFill = '#ffffff';
 const connectionEllipseFillStyle = 'solid';
 const connectionEllipseStroke = '#ffffff';
+const connectionPointDistance = 10;
 
 function CanvasComponent(props) {
     const [elements, setElements] = useState([]);
@@ -170,7 +171,16 @@ function CanvasComponent(props) {
 
     function highlightElement(element) {
         recolorElement(element, accentColor);
+    }
+
+    function selectElementToEdit(element) {
+        recolorElement(element, accentColor);
         showConnectionPointsOnElement(element);
+    }
+
+    function unSelectElementToEdit(element) {
+        recolorElement(element, elementColor);
+        hideConnectionPointsOnElement();
     }
 
     function unHighlightElement(element) {
@@ -196,14 +206,14 @@ function CanvasComponent(props) {
         // addConnectionPoint(createNewEllipse(6, (x1 + x2) / 2, y2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill)); // s
         // addConnectionPoint(createNewEllipse(7, x1, (y1 + y2) / 2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill)); // w
     
-        const nw = createNewEllipse(0, x1-5, y1-5, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill);
-        const ne = createNewEllipse(1, x2+5, y1-5, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill);
-        const sw = createNewEllipse(2, x1-5, y2+5, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill);
-        const se = createNewEllipse(3, x2+5, y2+5, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill);
-        const n = createNewEllipse(4, (x1 + x2) / 2, y1-5, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill);
-        const e = createNewEllipse(5, x2+5, (y1 + y2) / 2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill);
-        const s = createNewEllipse(6, (x1 + x2) / 2, y2+5, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill);
-        const w = createNewEllipse(7, x1-5, (y1 + y2) / 2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill);
+        const nw = createNewEllipse(0, x1-connectionPointDistance, y1-connectionPointDistance, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill);
+        const ne = createNewEllipse(1, x2+connectionPointDistance, y1-connectionPointDistance, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill);
+        const sw = createNewEllipse(2, x1-connectionPointDistance, y2+connectionPointDistance, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill);
+        const se = createNewEllipse(3, x2+connectionPointDistance, y2+connectionPointDistance, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill);
+        const n = createNewEllipse(4, (x1 + x2) / 2, y1-connectionPointDistance, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill);
+        const e = createNewEllipse(5, x2+connectionPointDistance, (y1 + y2) / 2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill);
+        const s = createNewEllipse(6, (x1 + x2) / 2, y2+connectionPointDistance, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill);
+        const w = createNewEllipse(7, x1-connectionPointDistance, (y1 + y2) / 2, connectionEllipseHeight, connectionEllipseWidth, connectionEllipseFill);
 
         setConnectionPoints([nw, ne, sw, se, n, e, s, w]);
         // addConnectionPoint(nw);
@@ -330,8 +340,9 @@ function CanvasComponent(props) {
         const{clientX, clientY} = event;
         if(!movingEnabled) return;
         if(action === 'moving') {
+            // unSelectElementToEdit(selectedElement);
             setHoveredElement(null);
-            hideConnectionPointsOnElement();
+
             const { id, x1, x2, y1, y2, type, offsetX, offsetY } = selectedElement;
             
             const width = x2 - x1;
@@ -442,8 +453,19 @@ function CanvasComponent(props) {
             if(element) {
                 const offsetX = clientX - element.x1;
                 const offsetY = clientY - element.y1;
-                setSelectedElement({...element, offsetX, offsetY});
 
+                if(selectedElement && element.id === selectedElement.id){
+                    // if element which is clicked is same as the selected element... unselect the selected element
+                    unSelectElementToEdit(element);
+                    setSelectedElement(null);
+                } else {
+                    // otherwise select the element clicked
+                    selectElementToEdit(element);
+                    setSelectedElement({...element, offsetX, offsetY});
+                }
+
+                
+                
                 if(element.position === "move"){
                     setAction('moving');
                 } else {
@@ -470,12 +492,6 @@ function CanvasComponent(props) {
 
     function handleMouseUp(event) {
         const index = elements.length - 1;
-
-        console.log(connectionPoints.length);
-        console.log(connectionPoints);
-        // connectionPoints.forEach(connectionPoint => {
-        //     if(connectionPoint) console.log(connectionPoint.id);
-        // });
         
         if(action === 'drawing') {
             const {id, type, strokeColor} = elements[index];
@@ -498,7 +514,7 @@ function CanvasComponent(props) {
             
         }
         setAction('none');
-        setSelectedElement(null);
+        // setSelectedElement(null);
         clearConEllipse();
     }
 
