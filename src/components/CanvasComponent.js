@@ -30,7 +30,8 @@ function CanvasComponent(props) {
     const [connectionPoints, setConnectionPoints] = useState([]);
     const [action, setAction] = useState('none');  
     const [activeTool, setActiveTool] = useContext(Context);
-    const [selectedElement, setSelectedElement] = useState(null);
+    const [foundElement, setFoundElement] = useState(null); // Element at mouse position, used for drawing/resizing etc
+    const [selectedElement, setSelectedElement] = useState(null); // Element selected for editing/connecting with lines
     const [hoveredElement, setHoveredElement] = useState(null);
     const [connectableElement, setConnectableElement] = useState(null);
     const [cursor, setCursor] = useState('default');
@@ -343,7 +344,7 @@ function CanvasComponent(props) {
             // unSelectElementToEdit(selectedElement);
             setHoveredElement(null);
 
-            const { id, x1, x2, y1, y2, type, offsetX, offsetY } = selectedElement;
+            const { id, x1, x2, y1, y2, type, offsetX, offsetY } = foundElement;
             
             const width = x2 - x1;
             const height = y2 - y1;
@@ -359,13 +360,13 @@ function CanvasComponent(props) {
         if(!resizingEnabled) return;
 
         if(action === 'resizing') {
-            if(selectedElement){
+            if(foundElement){
                 setHoveredElement(null);
                 hideConnectionPointsOnElement();
-                const { id, type, position, ...coordinates } = selectedElement;
+                const { id, type, position, ...coordinates } = foundElement;
                 const {x1, y1, x2, y2} = resizedCoordinates(clientX, clientY, position, coordinates);
                 updateElement(id, x1, y1, x2, y2, elementColor, type);
-                if(selectedElement.type === 'line'){
+                if(foundElement.type === 'line'){
                     handleConnectingElements(event);
                 }
             } 
@@ -454,17 +455,12 @@ function CanvasComponent(props) {
                 const offsetX = clientX - element.x1;
                 const offsetY = clientY - element.y1;
 
-                if(selectedElement && element.id === selectedElement.id){
-                    // if element which is clicked is same as the selected element... unselect the selected element
-                    unSelectElementToEdit(element);
-                    setSelectedElement(null);
+                if(!selectedElement || element.id !== selectedElement.id) {
+                    setSelectedElement(element);
                 } else {
-                    // otherwise select the element clicked
-                    selectElementToEdit(element);
-                    setSelectedElement({...element, offsetX, offsetY});
+                    setSelectedElement(null);
                 }
-
-                
+                setFoundElement({...element, offsetX, offsetY});
                 
                 if(element.position === "move"){
                     setAction('moving');
@@ -501,7 +497,7 @@ function CanvasComponent(props) {
 
         if(connectionEllipse) { //action == 'resizing' && selectedElement && selectedElement.type === 'line'
 
-            const { id, x1, y1, x2, y2, color, type } = selectedElement;
+            const { id, x1, y1, x2, y2, color, type } = foundElement;
             const { x, y } = connectionEllipse;
             updateElement(id, x, y, x2, y2, elementColor, type);
             console.log(getClosestToPoint(x ,y, x1, y1, x2, y2));
@@ -514,7 +510,7 @@ function CanvasComponent(props) {
             
         }
         setAction('none');
-        // setSelectedElement(null);
+        setFoundElement(null);
         clearConEllipse();
     }
 
