@@ -8,9 +8,9 @@ var connectionEllipse;
 
 // Feature toggles
 const drawingEnabled = true;
-const movingEnabled = true;
-const hoveringEnabled = true;
-const resizingEnabled = true;
+const movingEnabled = false;
+const hoveringEnabled = false;
+const resizingEnabled = false;
 
 // Application properties
 const elementColor = '#8ccbe6';//"#FF5A5A";
@@ -24,10 +24,23 @@ const connectionEllipseFill = '#ffffff';
 const connectionEllipseFillStyle = 'solid';
 const connectionEllipseStroke = '#ffffff';
 const connectionPointDistance = 10;
+const newItemConfig = {
+    start: {x: 100, y: 50},
+    size: 100,
+    fontSize: 15,
+    font: 'StrawberryCupcakes',
+    fontColor: lineColor,
+    textAlign: 'center',
+    distBetwItems: 75,
+    offsetX: 175,
+    offsetY: 175,
+    arrowDepth: 15
+}
+let showItemNumbers = true;
 
 function CanvasComponent(props) {
     const [elements, setElements] = useState([]);
-    const [connectionPoints, setConnectionPoints] = useState([]);
+    const [connectionPoints, setConnectionPoints] = useState([]); 
     const [action, setAction] = useState('none');  
     const [activeTool, setActiveTool] = useContext(Context);
     const [foundElement, setFoundElement] = useState(null); // Element at mouse position, used for drawing/resizing etc
@@ -40,15 +53,121 @@ function CanvasComponent(props) {
         const canvas = document.getElementById('main_canvas');
         const context = canvas.getContext('2d');
         context.clearRect(0, 0, canvas.width, canvas.height);
-
+        loadFont(newItemConfig.font);
         const roughCanvas = rough.canvas(canvas);
-        
-        elements.forEach(({roughElement}) => roughCanvas.draw(roughElement));
-        drawConnectionPoints(roughCanvas);
-        if(connectionEllipse) roughCanvas.draw(connectionEllipse.element);
-    }, [elements, connectionPoints, connectionEllipse], );
 
-    function CreateNewElement(id, x1, y1, x2, y2, strokeColor, type){
+        switch(activeTool){
+            case 'toggleItemNumbers':
+                showItemNumbers = !showItemNumbers;
+                setActiveTool('selection');
+                break;
+            case 'clear':
+                setElements([]);
+                setActiveTool('selection');
+                break;
+            case 'add': 
+                addNewItem();
+                setActiveTool('selection');
+            default:
+                elements.forEach((element) => {
+                    if(element.arrow){
+                        const {id, x1, y1, x2, y2, roughElement} = element.item;
+                        const {base, pt1, pt2} = element.arrow;
+                        roughCanvas.draw(base.roughElement);
+                        roughCanvas.draw(pt1.roughElement);
+                        roughCanvas.draw(pt2.roughElement);
+                        roughCanvas.draw(roughElement);
+                        const center = getIdPosition(x1, y1, x2, y2);
+                        context.font = `${newItemConfig.fontSize}px ${newItemConfig.font}`
+                        context.fillStyle = newItemConfig.fontColor;
+                        context.textAlign = newItemConfig.textAlign;
+                        if(showItemNumbers) context.fillText(id+1, center.x, y2-5);
+                    } else {
+                        const {id, x1, y1, x2, y2, roughElement} = element;
+                        roughCanvas.draw(roughElement);
+                        const center = getIdPosition(x1, y1, x2, y2);
+                        context.font = `${newItemConfig.fontSize}px ${newItemConfig.font}`
+                        context.fillStyle = newItemConfig.fontColor;
+                        context.textAlign = newItemConfig.textAlign;
+                        if(showItemNumbers) context.fillText(id+1, center.x, y2-5);
+                    }
+                });
+                drawConnectionPoints(roughCanvas);
+                if(connectionEllipse) roughCanvas.draw(connectionEllipse.element);
+                break;
+        }
+        
+        
+    }, [elements, activeTool, showItemNumbers, connectionPoints, connectionEllipse], );
+
+    function getIdPosition(x1, y1, x2, y2){
+        const x = Math.abs((x2 + x1) / 2);
+        let y;
+        if(y2 > y1) {
+            y = y2 - ((newItemConfig.size - newItemConfig.fontSize) / 2)
+        } else {
+            y = y1 - ((newItemConfig.size - newItemConfig.fontSize) / 2)
+        }
+        // console.log(`(${x1}, ${y1}) (${x2}, ${y2}) center: (${x}, ${y})`)
+        return {x, y}
+    }
+
+    function addNewItem(){
+        // id, x1, y1, x2, y2, color, type
+        let latestElement = elements[elements.length-1];
+        // console.log(`Last coords: (${x1}, ${y1}), (${x2}, ${y2})`);
+        let newItem;
+        if(latestElement){
+            if(latestElement.item){
+                latestElement = latestElement.item;
+            }
+            const {x1, y1, x2, y2, id} = latestElement;
+
+            const newConfig = {
+                id: id+1,
+                x1: x1 + newItemConfig.offsetX,
+                y1: y1,
+                x2: x2 + newItemConfig.offsetX,
+                y2: y2
+            }
+            const item = createNewElement(
+                newConfig.id, 
+                newConfig.x1, 
+                newConfig.y1, 
+                newConfig.x2, 
+                newConfig.y2, 
+                elementColor,
+                'rectangle');
+            const arrowFromPrevItem = createArrowToFromPrevItem(x2, y2);   
+            newItem = {item: item, arrow: arrowFromPrevItem};
+        } else {
+            newItem = createNewElement(
+                0, 
+                newItemConfig.start.x, 
+                newItemConfig.start.y, 
+                newItemConfig.start.x + newItemConfig.size, 
+                newItemConfig.start.y + newItemConfig.size, 
+                elementColor,
+                'rectangle');
+        }
+
+        addElement(newItem);
+    }
+
+    function createArrowToFromPrevItem(x, y){
+        let base //length = newItemConfig.distbetwitems
+        , pointer1 // x2 = nextItem.x, x1 = x2 - arrowdepth, y2 = base.y, y1 = base.y + arrowdepth
+        , pointer2; // x2 = nextItem.x, x1 = x2 - arrowdepth, y2 = base.y, y1 = base.y + arrowdepth
+
+        const baseY = y-(newItemConfig.size/2);
+        base = createNewElement(-1, x, baseY, x+newItemConfig.distBetwItems, baseY, connectColor, 'line');
+        pointer1 = createNewElement(-1, base.x2 - newItemConfig.arrowDepth, base.y2 - newItemConfig.arrowDepth, base.x2, base.y2, connectColor, 'line');
+        pointer2 = createNewElement(-1, base.x2 - newItemConfig.arrowDepth, base.y2 + newItemConfig.arrowDepth, base.x2, base.y2, connectColor, 'line');
+
+        return {base: base, pt1: pointer1, pt2: pointer2};
+    }
+
+    function createNewElement(id, x1, y1, x2, y2, strokeColor, type){
         if(!type) type = activeTool;
         var roughElement;
         switch(type) {
@@ -132,7 +251,6 @@ function CanvasComponent(props) {
                 return startLine || endLine || onLine;
             
             default:
-                console.log("no type");
                 break;
         }      
     }
@@ -262,7 +380,7 @@ function CanvasComponent(props) {
     }
 
     function updateElement(id, x1, y1, x2, y2, color, type) {
-        const updatedElement = CreateNewElement(id, x1, y1, x2, y2, color, type);
+        const updatedElement = createNewElement(id, x1, y1, x2, y2, color, type);
         
         if(updatedElement) addElement(updatedElement);
     }
@@ -323,7 +441,7 @@ function CanvasComponent(props) {
 
     function recolorElement(element, color){
         const {id, x1, x2, y1, y2, type} = element;
-        const recoloredElement = CreateNewElement(id, x1, y1, x2, y2, color, type);
+        const recoloredElement = createNewElement(id, x1, y1, x2, y2, color, type);
         if(recoloredElement) addElement(recoloredElement);
     }
 
@@ -473,7 +591,7 @@ function CanvasComponent(props) {
         } else {
             setAction('drawing');
             const id = elements.length;
-            const element = CreateNewElement(id, clientX, clientY, clientX, clientY, accentColor);
+            const element = createNewElement(id, clientX, clientY, clientX, clientY, accentColor);
             if(element) setElements(prevState => [...prevState, element]);
         }
     }
@@ -515,10 +633,14 @@ function CanvasComponent(props) {
     }
 
     function addElement(element) {
-        const index = element.id;
+        let index;
+        if(element.arrow){
+            index = element.item.id;
+        }else {
+            index = element.id;
+        }
         const elementsCopy = [...elements];
         elementsCopy[index] = element;
-        
         setElements(elementsCopy);
     }
 
@@ -546,6 +668,21 @@ function CanvasComponent(props) {
                 rc.draw(connectionPoint.element);
             }
         });
+    }
+
+    function loadFont(fontname){
+        var canvas = document.createElement("canvas");
+        //Setting the height and width is not really required
+        canvas.width = 16;
+        canvas.height = 16;
+        var ctx = canvas.getContext("2d");
+    
+        //There is no need to attach the canvas anywhere,
+        //calling fillText is enough to make the browser load the active font
+    
+        //If you have more than one custom font, you can just draw all of them here
+        ctx.font = "4px "+fontname;
+        ctx.fillText("text", 0, 8);
     }
 
     return (

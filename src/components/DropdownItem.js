@@ -1,6 +1,8 @@
 import React, { useContext } from 'react';
 import { Context } from '../Store';
 
+const excludeFromActive = ['add', 'delete'];
+
 function DropdownItem(props) {
     const [activeElement, setActiveElement] = useContext(Context);
 

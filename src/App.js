@@ -1,6 +1,8 @@
 import React, { useLayoutEffect, useState, useContext } from 'react';
 import rough from 'roughjs/bundled/rough.esm';
-import { ReactComponent as PlusIcon } from './icons/plus.svg';
+import { ReactComponent as DeleteIcon } from './icons/delete.svg';
+import { ReactComponent as PlusIcon } from './icons/plusBlack.svg';
+import { ReactComponent as PlusIconActive } from './icons/plusActive.svg';
 import { ReactComponent as CogIcon } from './icons/cog.svg';
 import { ReactComponent as DownChevronIcon } from './icons/down-chevron.svg';
 import { ReactComponent as RightChevronIcon } from './icons/right-chevron.svg';
@@ -52,6 +54,21 @@ const App = () => {
                   name="line"
                   iconActive={<LineIconActive />}
                   icon={<LineIcon />}>
+                </DropdownItem>
+                <DropdownItem
+                  name="add"
+                  iconActive={<PlusIcon />}
+                  icon={<PlusIcon />}>
+                </DropdownItem>
+                <DropdownItem
+                  name="clear"
+                  iconActive={<DeleteIcon />}
+                  icon={<DeleteIcon />}>
+                </DropdownItem>
+                <DropdownItem
+                  name="toggleItemNumbers"
+                  iconActive={<CogIcon />}
+                  icon={<CogIcon />}>
                 </DropdownItem>
               </DropdownMenu>
 

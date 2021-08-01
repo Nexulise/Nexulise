@@ -1,5 +1,8 @@
 /* Active element color: #FF5A5A */
-
+@font-face {
+  font-family: 'StrawberryCupcakes';
+  src: url('./fonts/StrawberryCupcakes.ttf');
+}
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -121,7 +124,7 @@ a {
 }
 
 .dropdown-icon-button svg {
-  /* fill: var(--text-color); */
+  fill: var(--text-color);
   width: 20px;
   height: 20px;
 }
