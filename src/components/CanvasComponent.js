@@ -1,4 +1,4 @@
-import { set } from 'lodash';
+import { findLastKey, set } from 'lodash';
 import React, { useLayoutEffect, useState, useContext } from 'react';
 import rough from 'roughjs/bundled/rough.esm';
 import { Context } from '../Store';
@@ -7,10 +7,11 @@ const generator = rough.generator();
 var connectionEllipse;
 
 // Feature toggles
-const drawingEnabled = true;
+const drawingEnabled = false;
 const movingEnabled = false;
 const hoveringEnabled = false;
 const resizingEnabled = false;
+const movingCanvasEnabled = true;
 
 // Application properties
 const elementColor = '#8ccbe6';//"#FF5A5A";
@@ -36,7 +37,16 @@ const newItemConfig = {
     offsetY: 175,
     arrowDepth: 15
 }
-let showItemNumbers = true;
+let showItemNumbers = false;
+
+// Moving canvas variables
+const marginLeftStart = 0;
+const marginTopStart = 0;
+let lastX;
+let lastY;
+let marginLeft = marginLeftStart;
+let marginTop = marginTopStart;
+let movingCanvas = false;
 
 function CanvasComponent(props) {
     const [elements, setElements] = useState([]);
@@ -48,56 +58,56 @@ function CanvasComponent(props) {
     const [hoveredElement, setHoveredElement] = useState(null);
     const [connectableElement, setConnectableElement] = useState(null);
     const [cursor, setCursor] = useState('default');
+    const canvas = document.getElementById('main_canvas');
 
     useLayoutEffect(() => {
-        const canvas = document.getElementById('main_canvas');
-        const context = canvas.getContext('2d');
-        context.clearRect(0, 0, canvas.width, canvas.height);
-        loadFont(newItemConfig.font);
-        const roughCanvas = rough.canvas(canvas);
+        if(canvas){
+            const context = canvas.getContext('2d');
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            loadFont(newItemConfig.font);
+            const roughCanvas = rough.canvas(canvas);
 
-        switch(activeTool){
-            case 'toggleItemNumbers':
-                showItemNumbers = !showItemNumbers;
-                setActiveTool('selection');
-                break;
-            case 'clear':
-                setElements([]);
-                setActiveTool('selection');
-                break;
-            case 'add': 
-                addNewItem();
-                setActiveTool('selection');
-            default:
-                elements.forEach((element) => {
-                    if(element.arrow){
-                        const {id, x1, y1, x2, y2, roughElement} = element.item;
-                        const {base, pt1, pt2} = element.arrow;
-                        roughCanvas.draw(base.roughElement);
-                        roughCanvas.draw(pt1.roughElement);
-                        roughCanvas.draw(pt2.roughElement);
-                        roughCanvas.draw(roughElement);
-                        const center = getIdPosition(x1, y1, x2, y2);
-                        context.font = `${newItemConfig.fontSize}px ${newItemConfig.font}`
-                        context.fillStyle = newItemConfig.fontColor;
-                        context.textAlign = newItemConfig.textAlign;
-                        if(showItemNumbers) context.fillText(id+1, center.x, y2-5);
-                    } else {
-                        const {id, x1, y1, x2, y2, roughElement} = element;
-                        roughCanvas.draw(roughElement);
-                        const center = getIdPosition(x1, y1, x2, y2);
-                        context.font = `${newItemConfig.fontSize}px ${newItemConfig.font}`
-                        context.fillStyle = newItemConfig.fontColor;
-                        context.textAlign = newItemConfig.textAlign;
-                        if(showItemNumbers) context.fillText(id+1, center.x, y2-5);
-                    }
-                });
-                drawConnectionPoints(roughCanvas);
-                if(connectionEllipse) roughCanvas.draw(connectionEllipse.element);
-                break;
+            switch(activeTool){
+                case 'toggleItemNumbers':
+                    showItemNumbers = !showItemNumbers;
+                    setActiveTool('selection');
+                    break;
+                case 'clear':
+                    setElements([]);
+                    setActiveTool('selection');
+                    break;
+                case 'add': 
+                    addNewItem();
+                    setActiveTool('selection');
+                default:
+                    elements.forEach((element) => {
+                        if(element.arrow){
+                            const {id, x1, y1, x2, y2, roughElement} = element.item;
+                            const {base, pt1, pt2} = element.arrow;
+                            roughCanvas.draw(base.roughElement);
+                            roughCanvas.draw(pt1.roughElement);
+                            roughCanvas.draw(pt2.roughElement);
+                            roughCanvas.draw(roughElement);
+                            const center = getIdPosition(x1, y1, x2, y2);
+                            context.font = `${newItemConfig.fontSize}px ${newItemConfig.font}`
+                            context.fillStyle = newItemConfig.fontColor;
+                            context.textAlign = newItemConfig.textAlign;
+                            if(showItemNumbers) context.fillText(id+1, center.x, y2-5);
+                        } else {
+                            const {id, x1, y1, x2, y2, roughElement} = element;
+                            roughCanvas.draw(roughElement);
+                            const center = getIdPosition(x1, y1, x2, y2);
+                            context.font = `${newItemConfig.fontSize}px ${newItemConfig.font}`
+                            context.fillStyle = newItemConfig.fontColor;
+                            context.textAlign = newItemConfig.textAlign;
+                            if(showItemNumbers) context.fillText(id+1, center.x, y2-5);
+                        }
+                    });
+                    drawConnectionPoints(roughCanvas);
+                    if(connectionEllipse) roughCanvas.draw(connectionEllipse.element);
+                    break;
+            }
         }
-        
-        
     }, [elements, activeTool, showItemNumbers, connectionPoints, connectionEllipse], );
 
     function getIdPosition(x1, y1, x2, y2){
@@ -120,6 +130,15 @@ function CanvasComponent(props) {
         if(latestElement){
             if(latestElement.item){
                 latestElement = latestElement.item;
+            }
+
+            const pixelsRequired = newItemConfig.distBetwItems + newItemConfig.size;
+            const pixelsLeftOnCanvas = canvas.width - latestElement.x2;
+            console.log(`pixels left on canvas: ${canvas.width} - ${latestElement.x2} = ${pixelsLeftOnCanvas}`);
+            console.log(`pixels required: ${pixelsRequired}`);
+
+            if(pixelsRequired > pixelsLeftOnCanvas - 25){
+                canvas.width = canvas.width + (pixelsRequired + 25);
             }
             const {x1, y1, x2, y2, id} = latestElement;
 
@@ -528,6 +547,47 @@ function CanvasComponent(props) {
             clearConEllipse();
         }
     }
+
+    function handleMovingCanvas(event) {
+        if(movingCanvas) {
+            var deltaX = event.clientX - lastX;
+            var deltaY = event.clientY - lastY;
+            lastX = event.clientX;
+            lastY = event.clientY;
+            marginLeft += deltaX;
+            marginTop += deltaY;
+            console.log(`marginLeft: ${marginLeft} canvas width: ${canvas.width}`);
+
+            // Canvas can move right or left when
+            if(marginLeft >= marginLeftStart && )
+
+            // Canvas can move to the right
+            if marginLeft >= marginLeftStart
+            // Canvas can move to the left
+            if (marginLeft + window.innerWidth) <= canvas.width
+
+            // Moving canvas to the right
+            if(marginLeft >= marginLeftStart){
+                console.log(`marginLeft <= marginLeftStart`);
+                canvas.style.marginLeft = `${marginLeftStart}px`;
+                marginLeft = marginLeftStart;
+            } else {
+                canvas.style.marginLeft = `${marginLeft}px`;
+            }
+
+            // Moving canvas to the left
+            // if(deltaY < 0){
+                // if((marginLeft + window.innerWidth) >= canvas.width){
+                //     console.log(`marginLeft + window.innerWidth) >= canvas.width`);
+                //     canvas.style.marginLeft = `${marginLeft+canvas.width}px`;
+                // } else {
+                //     canvas.style.marginLeft = `${marginLeft}px`;
+                // }
+            // }
+
+            marginTop <= marginTopStart ? canvas.style.marginTop = `${marginTop}px` : canvas.style.marginTop = `${marginTopStart}px`; 
+        }
+    }
     
     /**
      * Hovering over an element to hightlight it
@@ -568,26 +628,32 @@ function CanvasComponent(props) {
     function handleMouseDown(event) {
         const{clientX, clientY} = event;
         if(activeTool === 'selection') {
-            const element = getElementAtMousePosition(clientX, clientY, elements);
-            if(element) {
-                const offsetX = clientX - element.x1;
-                const offsetY = clientY - element.y1;
+            // const element = getElementAtMousePosition(clientX, clientY, elements);
+            // if(element) {
+            //     console.log(`[handleMouseDown]: Element found at mouse down`);
+            //     const offsetX = clientX - element.x1;
+            //     const offsetY = clientY - element.y1;
 
-                if(!selectedElement || element.id !== selectedElement.id) {
-                    setSelectedElement(element);
-                } else {
-                    setSelectedElement(null);
-                }
-                setFoundElement({...element, offsetX, offsetY});
+            //     if(!selectedElement || element.id !== selectedElement.id) {
+            //         setSelectedElement(element);
+            //     } else {
+            //         setSelectedElement(null);
+            //     }
+            //     setFoundElement({...element, offsetX, offsetY});
                 
-                if(element.position === "move"){
-                    setAction('moving');
-                } else {
-                    // console.log("Action set to resizing");
-                    setAction('resizing');
-                }
-                
-            }
+            //     if(element.position === "move"){
+            //         setAction('moving');
+            //     } else {
+            //         // console.log("Action set to resizing");
+            //         setAction('resizing');
+            //     }   
+            // } else {
+                // move canvas
+                console.log(`[handleMouseDown]: No element found at mouse down`);
+                movingCanvas = true;
+                lastX = event.clientX;
+                lastY = event.clientY;
+            // }
         } else {
             setAction('drawing');
             const id = elements.length;
@@ -602,10 +668,13 @@ function CanvasComponent(props) {
         handleMoving(event);
         handleHovering(event);
         handleResizing(event);
+        if(movingCanvasEnabled) handleMovingCanvas(event);
     }
 
     function handleMouseUp(event) {
         const index = elements.length - 1;
+
+        if(movingCanvas) movingCanvas = false;
         
         if(action === 'drawing') {
             const {id, type, strokeColor} = elements[index];

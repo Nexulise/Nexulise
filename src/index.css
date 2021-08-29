@@ -18,7 +18,7 @@ code {
 }
 
 :root {
-  --bg: #242526;
+  --bg: #242526; 
   --bg-accent: #484a4d;
   --text-color: #dadce1;
   --nav-size: 60px;

@@ -34,49 +34,51 @@ const App = () => {
 
   return (
     <>
-      <Store>
-        <div style={{ position: "fixed" }}>
-          <Navbar>
-            <NavItem closedIcon={<RightChevronIcon/>} openIcon={<DownChevronIcon />}>
+      <div style={{backgroundColor: '#333333'}}>
+        <Store>
+          <div style={{ position: "fixed" }}>
+            <Navbar>
+              <NavItem closedIcon={<RightChevronIcon/>} openIcon={<DownChevronIcon />}>
 
-              <DropdownMenu>
-                <DropdownItem 
-                  name="selection"
-                  iconActive={<SelectorIconActive />}
-                  icon={<SelectorIcon />}>
-                </DropdownItem>
-                <DropdownItem 
-                  name="rectangle"
-                  iconActive={<SquareIconActive />}
-                  icon={<SquareIcon />}>
-                </DropdownItem>
-                <DropdownItem
-                  name="line"
-                  iconActive={<LineIconActive />}
-                  icon={<LineIcon />}>
-                </DropdownItem>
-                <DropdownItem
-                  name="add"
-                  iconActive={<PlusIcon />}
-                  icon={<PlusIcon />}>
-                </DropdownItem>
-                <DropdownItem
-                  name="clear"
-                  iconActive={<DeleteIcon />}
-                  icon={<DeleteIcon />}>
-                </DropdownItem>
-                <DropdownItem
-                  name="toggleItemNumbers"
-                  iconActive={<CogIcon />}
-                  icon={<CogIcon />}>
-                </DropdownItem>
-              </DropdownMenu>
+                <DropdownMenu>
+                  <DropdownItem 
+                    name="selection"
+                    iconActive={<SelectorIconActive />}
+                    icon={<SelectorIcon />}>
+                  </DropdownItem>
+                  <DropdownItem 
+                    name="rectangle"
+                    iconActive={<SquareIconActive />}
+                    icon={<SquareIcon />}>
+                  </DropdownItem>
+                  <DropdownItem
+                    name="line"
+                    iconActive={<LineIconActive />}
+                    icon={<LineIcon />}>
+                  </DropdownItem>
+                  <DropdownItem
+                    name="add"
+                    iconActive={<PlusIcon />}
+                    icon={<PlusIcon />}>
+                  </DropdownItem>
+                  <DropdownItem
+                    name="clear"
+                    iconActive={<DeleteIcon />}
+                    icon={<DeleteIcon />}>
+                  </DropdownItem>
+                  <DropdownItem
+                    name="toggleItemNumbers"
+                    iconActive={<CogIcon />}
+                    icon={<CogIcon />}>
+                  </DropdownItem>
+                </DropdownMenu>
 
-            </NavItem>
-          </Navbar>
-        </div>
+              </NavItem>
+            </Navbar>
+          </div>
         <CanvasComponent />
-      </Store>
+        </Store>
+      </div>
     </>
   );
 };
